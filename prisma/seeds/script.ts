@@ -1,8 +1,7 @@
-import 'dotenv/config';
+import { prisma } from '@/lib/prisma';
+import { UserRole } from '@prisma/client';
 import { hash } from 'bcryptjs';
-import { PrismaClient, UserRole } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import 'dotenv/config';
 
 async function main() {
   const tenant = await prisma.tenant.upsert({
