@@ -1,48 +1,236 @@
 # Nest Template
 
-Template base de API com NestJS, Prisma e autenticação JWT, já preparado para multi-tenancy em `single database`.
+Template de API com NestJS, Prisma e autenticação JWT, organizado para servir como base de projetos multi-tenant em `single database`.
 
-## O que já vem pronto
+## Visão geral
 
-- `NestJS` com estrutura modular.
-- `Prisma` com `PostgreSQL`.
-- `JWT` para autenticação.
-- Módulo de `tenants`.
-- Módulo de `users`.
-- Resposta padronizada com interceptor global.
-- Tratamento global de exceções.
-- Escopo multi-tenant via `tenantId` em todas as operações de usuário.
+Este projeto foi estruturado para separar bem:
 
-## Estratégia de multi-tenancy
+- bootstrap da aplicação
+- infraestrutura compartilhada
+- contratos e implementações de acesso a dados
+- regras de negócio por módulo
+- camada HTTP
 
-Este template usa `single database multi-tenancy`.
+A ideia é que novos domínios sigam o mesmo desenho usado aqui em `tenants` e `users`.
 
-- Existe uma tabela `tenants`.
-- A tabela `users` possui a coluna `tenantId`.
-- Toda autenticação é feita com `tenantSlug + cpf + password`.
-- Após o login, o token carrega `sub`, `tenantId` e `role`.
-- As rotas autenticadas de usuários só enxergam registros do tenant do token.
+## Arquitetura
 
-Isso deixa a base simples para evoluir e já evita vazamento de dados entre tenants.
+O projeto está dividido em três blocos principais:
 
-## Estrutura principal
+### `src/main.ts`
+
+Ponto de entrada da aplicação.
+
+Aqui ficam as decisões globais de runtime:
+
+- criação da aplicação Nest
+- `ValidationPipe`
+- filtro global de exceções
+- interceptor global de resposta
+- prefixo global `/api`
+- CORS
+
+### `src/infrastructure`
+
+Camada de infraestrutura transversal.
+
+- `env/`: valida e expõe variáveis de ambiente
+- `database/prisma/`: registra o `PrismaService` como provider global
+
+Essa camada cuida de dependências técnicas, não de regra de negócio.
+
+### `src/modules`
+
+Camada modular da aplicação.
+
+Cada domínio fica isolado no seu próprio módulo, com responsabilidades separadas em:
+
+- `dtos/`: contrato de entrada e validação
+- `entities/`: tipos e estruturas do domínio
+- `repositories/`: contrato abstrato e implementação concreta
+- `services/`: regra de negócio
+- `http/`: controllers e rotas
+
+Esse padrão ajuda a manter a aplicação previsível quando novos módulos forem adicionados.
+
+## Estrutura de pastas
 
 ```text
 src/
   common/
+    decorators/
+    domain/
+    exceptions/
+    interceptors/
+    utils/
   infrastructure/
-    database/prisma/
+    database/
+      prisma/
     env/
+  lib/
+    prisma.ts
   modules/
     auth/
     cryptography/
     tenants/
     users/
+  app.module.ts
+  main.ts
+
 prisma/
+  generated/
+  migrations/
   schema.prisma
+  seeds/
+
+Dockerfile
+docker-compose.yml
+.env.example
 ```
 
-## Como subir
+## Módulos atuais
+
+### `auth`
+
+Responsável pela autenticação.
+
+Fluxo principal:
+
+1. recebe `tenantSlug`, `cpf` e `password`
+2. valida se o tenant existe e está ativo
+3. busca o usuário dentro do tenant
+4. compara a senha com `bcrypt`
+5. emite um JWT com `sub`, `tenantId` e `role`
+
+Também é o módulo que registra o `JwtAuthGuard` global.
+
+### `tenants`
+
+Responsável pela criação e consulta de tenants.
+
+Hoje ele representa a base da estratégia multi-tenant e serve como dependência para outros módulos que precisem validar contexto organizacional.
+
+### `users`
+
+Responsável pelo CRUD de usuários.
+
+As regras principais do módulo já nascem tenant-aware:
+
+- criação depende de um tenant válido
+- `email` e `cpf` são únicos por tenant
+- listagem, busca, atualização e remoção usam `tenantId` do token
+- a senha nunca é retornada na resposta
+
+### `cryptography`
+
+Centraliza abstrações e implementações de segurança:
+
+- geração de hash
+- comparação de hash
+- geração de token
+
+Isso evita acoplamento direto dos services a bibliotecas como `bcryptjs` e `@nestjs/jwt`.
+
+## Fluxo de requisição
+
+Em alto nível, as requisições seguem este caminho:
+
+```text
+Controller -> DTO -> Service -> Repository Contract -> Repository Implementation -> Prisma
+```
+
+Esse fluxo foi escolhido para:
+
+- manter controllers finos
+- concentrar regra de negócio em services
+- permitir trocar implementação de repositório sem quebrar os módulos
+- facilitar crescimento do código sem misturar transporte, domínio e persistência
+
+## Multi-tenancy
+
+O projeto usa a estratégia `single database`.
+
+### Como está modelado
+
+- existe uma tabela `Tenant`
+- existe uma tabela `User` com chave estrangeira `tenantId`
+- as unicidades de usuário são compostas por tenant
+
+Exemplos:
+
+- `@@unique([tenantId, email])`
+- `@@unique([tenantId, cpf])`
+
+### Como isso aparece na aplicação
+
+- o login exige `tenantSlug`
+- o token carrega `tenantId`
+- os services de `users` usam `tenantId` para isolar as operações
+
+Esse desenho serve como referência para qualquer novo módulo que precise respeitar escopo por tenant.
+
+## Camada comum
+
+`src/common` concentra elementos reutilizáveis da aplicação:
+
+- exceções de domínio
+- filtro global de erro
+- interceptor de resposta
+- decorators compartilhados
+- utilitários auxiliares
+
+Isso evita duplicação entre módulos e mantém o comportamento HTTP padronizado.
+
+## Persistência com Prisma
+
+O schema principal está em [prisma/schema.prisma](/Users/monnueryjunior/Projects/backend/nest-template/prisma/schema.prisma:1).
+
+O projeto usa Prisma com adapter PostgreSQL:
+
+- `PrismaService` dentro da aplicação Nest
+- `src/lib/prisma.ts` para uso fora do container Nest, como o seed
+
+O client gerado fica em `prisma/generated`, o que deixa explícita a separação entre código manual e código gerado.
+
+## Seed
+
+O seed está em prisma/seeds/script.ts.
+
+Ele cria ou atualiza:
+
+- um tenant padrão `default`
+- um usuário admin padrão dentro desse tenant
+
+Isso facilita subir a base e testar autenticação imediatamente.
+
+## Docker
+
+O projeto também possui uma estrutura pronta para execução containerizada:
+
+- Dockerfile para build da aplicação
+- docker-compose.yml para orquestrar API + PostgreSQL
+
+No fluxo Docker, a aplicação sobe executando:
+
+1. migrations
+2. seed
+3. aplicação em modo produtivo
+
+## Variáveis de ambiente
+
+O arquivo base está em [.env.example](/Users/monnueryjunior/Projects/backend/nest-template/.env.example:1).
+
+Variáveis principais:
+
+- `DATABASE_URL`
+- `JWT_SECRET`
+- `PORT`
+- `NODE_ENV`
+
+## Como começar
+
+### Local
 
 ```bash
 pnpm install
@@ -53,149 +241,31 @@ pnpm prisma:seed
 pnpm start:dev
 ```
 
-A aplicação sobe por padrão em `http://localhost:3333/api`.
-
-## Rodando com Docker
-
-Para subir a API e o Postgres com Docker:
+### Docker
 
 ```bash
 docker compose up --build
 ```
-
-Serviços expostos:
-
-- API: `http://localhost:3333/api`
-- PostgreSQL: `localhost:5432`
-
-O container da API já executa automaticamente:
-
-- `prisma migrate deploy`
-- `prisma:seed`
-- `start:prod`
-
-Se quiser derrubar tudo:
-
-```bash
-docker compose down
-```
-
-Se quiser remover também o volume do banco:
-
-```bash
-docker compose down -v
-```
-
-## Variáveis de ambiente
-
-```env
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/nest_template?schema=public"
-JWT_SECRET="change-me-with-at-least-32-characters"
-PORT=3333
-NODE_ENV="development"
-```
-
-## Fluxo inicial recomendado
-
-1. Rodar o seed inicial.
-2. Fazer login com `tenantSlug`, `cpf` e `password`.
-3. Consumir as rotas protegidas com `Authorization: Bearer <token>`.
-4. Criar novos tenants e usuários conforme o projeto evoluir.
-
-## Seed padrão
-
-O comando abaixo cria um tenant e um admin padrão:
-
-```bash
-pnpm prisma:seed
-```
-
-Dados criados:
-
-- `tenantSlug`: `default`
-- `email`: `admin@template.local`
-- `cpf`: `00000000000`
-- `password`: `123456`
 
 ## Endpoints base
 
-### Criar tenant
+- `POST /api/tenants`
+- `POST /api/users`
+- `POST /api/auth/login`
+- `GET /api/users`
+- `GET /api/users/:id`
+- `PUT /api/users/:id`
+- `DELETE /api/users/:id`
 
-`POST /api/tenants`
+## Como expandir o template
 
-```json
-{
-  "name": "Rentz",
-  "slug": "rentz"
-}
-```
+Ao adicionar um novo domínio, a ideia é repetir o mesmo padrão:
 
-### Criar usuário
+1. criar o módulo
+2. definir DTOs
+3. definir contratos de repositório
+4. implementar services com regra de negócio
+5. implementar controllers
+6. propagar `tenantId` para a persistência quando o domínio for multi-tenant
 
-`POST /api/users`
-
-```json
-{
-  "tenantId": "uuid-do-tenant",
-  "name": "Admin",
-  "email": "admin@rentz.com",
-  "cpf": "12345678900",
-  "phone": "85999999999",
-  "password": "123456",
-  "role": "admin"
-}
-```
-
-### Login
-
-`POST /api/auth/login`
-
-```json
-{
-  "tenantSlug": "rentz",
-  "cpf": "12345678900",
-  "password": "123456"
-}
-```
-
-### Listar usuários do tenant autenticado
-
-`GET /api/users`
-
-Header:
-
-```text
-Authorization: Bearer <token>
-```
-
-### Buscar usuário por id
-
-`GET /api/users/:id`
-
-### Atualizar usuário
-
-`PUT /api/users/:id`
-
-### Remover usuário
-
-`DELETE /api/users/:id`
-
-## Comandos úteis
-
-```bash
-pnpm start:dev
-pnpm build
-pnpm lint
-pnpm prisma:generate
-pnpm prisma:migrate --name init
-pnpm prisma:seed
-pnpm prisma:studio
-docker compose up --build
-```
-
-## Observações
-
-- O retorno dos endpoints de usuário não expõe `password`.
-- `email` e `cpf` são únicos por tenant, não globalmente.
-- O template está propositalmente enxuto para servir de base e crescer por módulos.
-- Se você quiser, o próximo passo natural é adicionar `roles/permissions`, `refresh token`, `auditoria` e mais domínios de negócio.
+Isso mantém consistência entre os módulos e evita que a arquitetura se degrade conforme o projeto cresce.
