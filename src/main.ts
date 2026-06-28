@@ -29,7 +29,7 @@ async function bootstrap() {
   const port = configService.get('PORT', { infer: true });
   const env = configService.get('NODE_ENV', { infer: true });
 
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
   console.info(
     `Server ready at http://localhost:${port}/api (${env ?? 'development'})`,
   );

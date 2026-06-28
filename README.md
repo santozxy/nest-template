@@ -55,6 +55,37 @@ pnpm start:dev
 
 A aplicação sobe por padrão em `http://localhost:3333/api`.
 
+## Rodando com Docker
+
+Para subir a API e o Postgres com Docker:
+
+```bash
+docker compose up --build
+```
+
+Serviços expostos:
+
+- API: `http://localhost:3333/api`
+- PostgreSQL: `localhost:5432`
+
+O container da API já executa automaticamente:
+
+- `prisma migrate deploy`
+- `prisma:seed`
+- `start:prod`
+
+Se quiser derrubar tudo:
+
+```bash
+docker compose down
+```
+
+Se quiser remover também o volume do banco:
+
+```bash
+docker compose down -v
+```
+
 ## Variáveis de ambiente
 
 ```env
@@ -159,6 +190,7 @@ pnpm prisma:generate
 pnpm prisma:migrate --name init
 pnpm prisma:seed
 pnpm prisma:studio
+docker compose up --build
 ```
 
 ## Observações
