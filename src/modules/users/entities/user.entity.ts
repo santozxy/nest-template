@@ -1,6 +1,9 @@
-import { UserRole } from '../../../../prisma/generated/client';
+export const UserRole = {
+  admin: 'admin',
+  member: 'member',
+} as const;
 
-export { UserRole };
+export type UserRole = (typeof UserRole)[keyof typeof UserRole];
 
 export interface User {
   id: string;
