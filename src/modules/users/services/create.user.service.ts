@@ -2,8 +2,8 @@ import { ConflictException } from '@/common/domain/http.errors';
 import { HashGenerator } from '@/modules/cryptography/repositories/hash.generator.contract';
 import { Injectable } from '@nestjs/common';
 import { CreateUserDto } from '../dtos/create.user.dto';
-import { withoutUserPassword } from '../entities/user.entity';
 import { UserContract } from '../repositories/user.contract';
+import { withoutUserPassword } from '../utils/user.without.password.util';
 
 @Injectable()
 export class CreateUserService {

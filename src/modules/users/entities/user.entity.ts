@@ -35,11 +35,3 @@ export interface UpdateUser {
   password?: string;
   role?: UserRole;
 }
-
-export function withoutUserPassword(user: User): PublicUser {
-  const { password, ...publicUser } = user;
-
-  void password;
-
-  return publicUser;
-}

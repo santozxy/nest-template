@@ -1,7 +1,7 @@
 import { NotFoundException } from '@/common/domain/http.errors';
 import { Injectable } from '@nestjs/common';
-import { withoutUserPassword } from '../entities/user.entity';
 import { UserContract } from '../repositories/user.contract';
+import { withoutUserPassword } from '../utils/user.without.password.util';
 
 @Injectable()
 export class FindUserByIdService {

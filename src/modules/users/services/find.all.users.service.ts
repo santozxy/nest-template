@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { FindAllUsersDto } from '../dtos/find.all.users.dto';
-import { withoutUserPassword } from '../entities/user.entity';
 import { UserContract } from '../repositories/user.contract';
+import { withoutUserPassword } from '../utils/user.without.password.util';
 
 @Injectable()
 export class FindAllUsersService {

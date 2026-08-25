@@ -1,8 +1,8 @@
 import { UnauthorizedException } from '@/common/domain/http.errors';
 import { Encrypter } from '@/modules/cryptography/repositories/encrypter.contract';
 import { HashComparer } from '@/modules/cryptography/repositories/hash.compare.contract';
-import { withoutUserPassword } from '@/modules/users/entities/user.entity';
 import { UserContract } from '@/modules/users/repositories/user.contract';
+import { withoutUserPassword } from '@/modules/users/utils/user.without.password.util';
 import { Injectable } from '@nestjs/common';
 
 export interface AuthLogin {

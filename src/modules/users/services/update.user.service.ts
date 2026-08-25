@@ -5,8 +5,9 @@ import {
 import { HashGenerator } from '@/modules/cryptography/repositories/hash.generator.contract';
 import { Injectable } from '@nestjs/common';
 import { UpdateUserDto } from '../dtos/update.user.dto';
-import { UpdateUser, withoutUserPassword } from '../entities/user.entity';
+import { UpdateUser } from '../entities/user.entity';
 import { UserContract } from '../repositories/user.contract';
+import { withoutUserPassword } from '../utils/user.without.password.util';
 
 @Injectable()
 export class UpdateUserService {
